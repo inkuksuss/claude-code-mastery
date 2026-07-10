@@ -12,5 +12,32 @@
     ],
     "defaultMode": "plan",
     "language": "Korean"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/log-bash-command.sh",
+            "timeout": 10,
+            "statusMessage": "Bash 명령어 로깅 중..."
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "agent",
+            "prompt": "git status와 git diff로 커밋되지 않은 변경사항이 있는지 확인해라. 코드 파일(설정/문서 제외) 변경이 없다면 아무 작업도 하지 말고 즉시 종료해라. 변경사항이 있다면 code-reviewer 서브에이전트의 역할과 절차를 그대로 따라 방금 완료된 코드 구현을 리뷰하고, 발견한 문제를 한국어로 보고해라.",
+            "timeout": 180,
+            "statusMessage": "코드 변경사항 자동 리뷰 중..."
+          }
+        ]
+      }
+    ]
   }
 }
