@@ -4,7 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { navLinks } from "@/components/layout/nav-links"
 
 // 모바일 네비게이션, Sheet를 기반으로 한다
@@ -32,6 +32,9 @@ function MobileNav() {
 				<span className="sr-only">메뉴</span>
 			</SheetTrigger>
 			<SheetContent side="right">
+				<SheetHeader>
+					<SheetTitle className="sr-only">메뉴</SheetTitle>
+				</SheetHeader>
 				<nav className="flex flex-col gap-2">
 					{navLinks.map((link) => (
 						<Link

@@ -3,11 +3,11 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Field, FieldLabel } from "@/components/ui/field"
 import { NewsletterForm } from "@/components/newsletter-form"
 
 // 스타터킷 홈페이지
@@ -121,26 +121,6 @@ export default function Home() {
 						</CardContent>
 					</Card>
 
-					{/* Avatar Showcase */}
-					<Card>
-						<CardHeader>
-							<CardTitle className="text-base">아바타 (Avatar)</CardTitle>
-							<CardDescription>사용자 또는 작성자 표시</CardDescription>
-						</CardHeader>
-						<CardContent className="flex items-center gap-4">
-							<Avatar>
-								<AvatarImage src="https://github.com/shadcn.png" />
-								<AvatarFallback>CN</AvatarFallback>
-							</Avatar>
-							<div className="flex-1">
-								<p className="text-sm font-medium">Starter Kit</p>
-								<p className="text-xs text-muted-foreground">
-									Made with shadcn/ui
-								</p>
-							</div>
-						</CardContent>
-					</Card>
-
 					{/* Tooltip Showcase */}
 					<Card>
 						<CardHeader>
@@ -216,12 +196,10 @@ export default function Home() {
 				</h2>
 				<Card>
 					<CardContent className="space-y-4 pt-6">
-						<div className="space-y-2">
-							<label className="text-sm font-medium">
-								관심 분야 선택
-							</label>
+						<Field>
+							<FieldLabel htmlFor="interest">관심 분야 선택</FieldLabel>
 							<Select>
-								<SelectTrigger>
+								<SelectTrigger id="interest">
 									<SelectValue placeholder="분야를 선택하세요" />
 								</SelectTrigger>
 								<SelectContent>
@@ -231,7 +209,7 @@ export default function Home() {
 									<SelectItem value="devops">DevOps</SelectItem>
 								</SelectContent>
 							</Select>
-						</div>
+						</Field>
 						<Button className="w-full">선택 완료</Button>
 					</CardContent>
 				</Card>

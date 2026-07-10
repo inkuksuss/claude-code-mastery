@@ -26,6 +26,8 @@ function NewsletterForm() {
 	const [subscribed, setSubscribed] = useLocalStorage("newsletter-subscribed", false, {
 		initializeWithValue: false,
 	})
+	const [isSubmitting, setIsSubmitting] = React.useState(false)
+	const [submitError, setSubmitError] = React.useState(false)
 	const {
 		register,
 		handleSubmit,
@@ -34,8 +36,19 @@ function NewsletterForm() {
 		resolver: zodResolver(newsletterSchema),
 	})
 
-	function onSubmit() {
-		setSubscribed(true)
+	async function onSubmit(data: NewsletterValues) {
+		setIsSubmitting(true)
+		setSubmitError(false)
+		try {
+			// TODO: 실제 구독 API 호출로 교체하세요
+			// await subscribeNewsletter(data.email)
+			setSubscribed(true)
+		} catch (error) {
+			console.error(`뉴스레터 구독 실패 (${data.email})`, error)
+			setSubmitError(true)
+		} finally {
+			setIsSubmitting(false)
+		}
 	}
 
 	if (subscribed) {
@@ -74,7 +87,12 @@ function NewsletterForm() {
 					<FieldError errors={[errors.email]} />
 				)}
 			</Field>
-			<Button type="submit" className="w-full">
+			{submitError && (
+				<p className="text-sm text-destructive">
+					구독에 실패했습니다. 잠시 후 다시 시도해주세요.
+				</p>
+			)}
+			<Button type="submit" className="w-full" disabled={isSubmitting}>
 				뉴스레터 구독
 			</Button>
 		</form>
