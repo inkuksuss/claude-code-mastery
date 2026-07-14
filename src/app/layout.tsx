@@ -18,8 +18,8 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-	title: "Modern Web Starter Kit",
-	description: "Next.js, TypeScript, Tailwind CSS v4, shadcn/ui 기반 모던 웹 스타터킷",
+	title: "견적서 뷰어",
+	description: "전달받은 링크로 견적서를 열람하고 PDF로 저장하세요.",
 }
 
 export default function RootLayout({
