@@ -1,6 +1,6 @@
 import { Badge, badgeVariants } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import type { QuoteStatus } from "@/lib/quote-schema"
+import { formatDateKR, type QuoteStatus } from "@/lib/quote-schema"
 import type { VariantProps } from "class-variance-authority"
 
 export interface QuoteHeaderProps {
@@ -19,15 +19,6 @@ const statusBadgeVariant: Record<QuoteStatus, BadgeVariant> = {
 	발송됨: "secondary",
 	승인: "default",
 	만료: "destructive",
-}
-
-// 날짜를 한국어 표기(예: 2026년 7월 1일)로 변환한다.
-function formatDateKR(date: Date): string {
-	return date.toLocaleDateString("ko-KR", {
-		year: "numeric",
-		month: "long",
-		day: "numeric",
-	})
 }
 
 // 견적명·번호·발행일·유효기간·상태 배지 헤더

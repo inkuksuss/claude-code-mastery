@@ -14,6 +14,7 @@ import {
 import {
 	calculateQuoteAmounts,
 	getSupplierInfo,
+	sortItemsByOrder,
 	type Quote,
 } from "@/lib/quote-schema"
 
@@ -88,12 +89,7 @@ export default async function QuotePage({
 	const amounts = calculateQuoteAmounts(quote.items)
 
 	// 항목은 순서 속성 오름차순, 순서 없는 항목(null)은 뒤로 정렬 (PRD 5.2)
-	const sortedItems = [...quote.items].sort((a, b) => {
-		if (a.order === null && b.order === null) return 0
-		if (a.order === null) return 1
-		if (b.order === null) return -1
-		return a.order - b.order
-	})
+	const sortedItems = sortItemsByOrder(quote.items)
 
 	return (
 		<div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-8 sm:px-6 sm:py-12">

@@ -174,6 +174,27 @@ function formatKRW(amount: number): string {
 	return `${amount.toLocaleString("ko-KR")}원`
 }
 
+// 날짜를 한국어 표기(예: 2026년 7월 1일)로 변환한다.
+// 웹 뷰(quote-header.tsx)와 PDF(quote-pdf-document.tsx)가 공유한다.
+function formatDateKR(date: Date): string {
+	return date.toLocaleDateString("ko-KR", {
+		year: "numeric",
+		month: "long",
+		day: "numeric",
+	})
+}
+
+// 항목을 순서 오름차순으로 정렬한다. 순서가 없는 항목(null)은 뒤로 보낸다.
+// 웹 뷰(page.tsx)와 PDF(quote-pdf-document.tsx)가 공유한다.
+function sortItemsByOrder(items: QuoteItem[]): QuoteItem[] {
+	return [...items].sort((a, b) => {
+		if (a.order === null && b.order === null) return 0
+		if (a.order === null) return 1
+		if (b.order === null) return -1
+		return a.order - b.order
+	})
+}
+
 // ── 만료 판정 (P1, Task 011에서 실사용) ──────────────────
 
 function resolveDisplayStatus(
@@ -217,6 +238,8 @@ export {
 	parseNotionQuotePage,
 	calculateQuoteAmounts,
 	formatKRW,
+	formatDateKR,
+	sortItemsByOrder,
 	resolveDisplayStatus,
 	getSupplierInfo,
 }
