@@ -6,13 +6,19 @@ import { QuoteItemsTable } from "@/components/quote/quote-items-table"
 import { QuotePartyInfo } from "@/components/quote/quote-party-info"
 import { QuotePdfButton } from "@/components/quote/quote-pdf-button"
 import { QuoteSummary } from "@/components/quote/quote-summary"
-import { findMockQuoteByToken, MOCK_SUPPLIER } from "@/lib/quote-mock"
-import { calculateQuoteAmounts } from "@/lib/quote-schema"
+import {
+	getQuoteByToken,
+	NotionDataInvalidError,
+	NotionRateLimitError,
+} from "@/lib/notion"
+import {
+	calculateQuoteAmounts,
+	getSupplierInfo,
+	type Quote,
+} from "@/lib/quote-schema"
 
 // 견적서 웹 뷰 라우트 (RSC)
-// Task 004: 더미 데이터(quote-mock) 기반 7개 블록 조립.
-// - 데이터 소스는 Task 006에서 findMockQuoteByToken → Notion 조회(lib/notion.ts)로 교체
-// - 공급자 정보는 Task 006에서 MOCK_SUPPLIER → getSupplierInfo()(환경 변수)로 교체
+// Task 006: 데이터 소스를 mock(quote-mock) → 실제 Notion 조회(lib/notion.ts)로 교체.
 // - 접근 제어의 완전한 동일 404 보장(타이밍 포함)은 Task 007에서 마무리
 export const metadata: Metadata = {
 	title: "견적서",
@@ -22,18 +28,61 @@ export const metadata: Metadata = {
 	},
 }
 
+// Notion 조회 실패 시 안내 화면 (500/404가 아닌 별도 텍스트 — RSC로 충분)
+function QuoteErrorNotice({
+	heading,
+	description,
+}: {
+	heading: string
+	description: string
+}) {
+	return (
+		<div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-2 px-4 py-24 text-center sm:px-6">
+			<h1 className="text-lg font-semibold text-foreground">{heading}</h1>
+			<p className="text-sm text-muted-foreground">{description}</p>
+		</div>
+	)
+}
+
 export default async function QuotePage({
 	params,
 }: {
 	params: Promise<{ token: string }>
 }) {
 	const { token } = await params
-	const quote = findMockQuoteByToken(token)
 
-	// 존재하지 않는 토큰과 '작성중' 상태는 구분 불가능한 동일 404 (PRD 5.2/5.3)
-	if (!quote || quote.status === "작성중") {
+	// Notion 조회 — 식별 가능한 실패(레이트 리밋/데이터 불량)는 안내 화면으로 분기하고,
+	// 그 외 예외는 다시 던져 Next.js 기본 에러 처리(500)에 맡긴다
+	let quote: Quote | null
+	try {
+		quote = await getQuoteByToken(token)
+	} catch (error) {
+		if (error instanceof NotionRateLimitError) {
+			return (
+				<QuoteErrorNotice
+					heading="잠시 후 다시 시도해주세요"
+					description="요청이 일시적으로 많아 견적서를 불러오지 못했습니다. 잠시 후 새로고침해주세요."
+				/>
+			)
+		}
+		if (error instanceof NotionDataInvalidError) {
+			return (
+				<QuoteErrorNotice
+					heading="견적서 정보가 올바르지 않습니다"
+					description="견적서 데이터에 문제가 있어 표시할 수 없습니다. 견적서 발급자에게 문의해주세요."
+				/>
+			)
+		}
+		throw error
+	}
+
+	// 토큰 형식 불일치·미존재·'작성중'(비공개)은 모두 lib 단계에서 null로 정규화됨 → 동일 404
+	if (!quote) {
 		notFound()
 	}
+
+	// 공급자 정보는 환경 변수(SUPPLIER_*)에서 로드 (가정 A7 — 싱글 테넌트)
+	const supplier = getSupplierInfo()
 
 	// 금액은 항상 서버에서 계산 (Notion 저장값을 신뢰하지 않는 원칙과 동일)
 	const amounts = calculateQuoteAmounts(quote.items)
@@ -59,7 +108,7 @@ export default async function QuotePage({
 
 			{/* 블록 1·3: 공급자/수신자 정보 (QuotePartyInfo가 두 블록을 묶어 렌더링) */}
 			<QuotePartyInfo
-				supplier={MOCK_SUPPLIER}
+				supplier={supplier}
 				client={{ name: quote.clientName, manager: quote.clientManager }}
 			/>
 

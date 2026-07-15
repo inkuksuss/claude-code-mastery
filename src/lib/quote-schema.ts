@@ -1,8 +1,13 @@
+import type { PageObjectResponse } from "@notionhq/client"
 import { z } from "zod"
 
 // ── 내부 도메인 타입 ──────────────────────────────
 
 export type QuoteStatus = "작성중" | "발송됨" | "승인" | "만료"
+
+// "작성중" 상태 리터럴의 단일 소스 — lib/notion.ts의 조기 접근 제어 판정에서 재사용해
+// quoteStatusSchema와 값이 어긋나지 않도록 한다
+export const DRAFT_STATUS: QuoteStatus = "작성중"
 
 export interface QuoteItem {
 	id: string
@@ -54,11 +59,91 @@ const quoteSchema = z.object({
 	items: z.array(quoteItemSchema),
 })
 
-// Notion 페이지 속성 원시 구조 → 위 quoteSchema로 매핑하는 파서는
-// Task 006에서 lib/notion.ts와 함께 구현한다 (여기서는 시그니처만 정의).
-function parseNotionQuotePage(page: unknown): Quote {
-	void page
-	throw new Error("parseNotionQuotePage는 아직 구현되지 않았습니다. (Task 006)")
+// ── Notion property 타입별 추출 헬퍼 ──────────────────────
+// Notion 응답은 속성 타입마다 형태가 달라 타입 가드 후에만 값을 꺼낸다.
+// 기대 타입이 아니거나 값이 비어 있으면 null을 반환하고,
+// 필수 여부 판단은 최종 quoteSchema.parse에 위임한다.
+
+type NotionProperties = PageObjectResponse["properties"]
+
+// Title → plain_text 결합 (빈 문자열이면 null)
+function extractTitle(properties: NotionProperties, name: string): string | null {
+	const property = properties[name]
+	if (property?.type !== "title") return null
+	const text = property.title.map((t) => t.plain_text).join("")
+	return text.length > 0 ? text : null
+}
+
+// Rich text → plain_text 결합 (빈 문자열이면 null)
+function extractRichText(
+	properties: NotionProperties,
+	name: string
+): string | null {
+	const property = properties[name]
+	if (property?.type !== "rich_text") return null
+	const text = property.rich_text.map((t) => t.plain_text).join("")
+	return text.length > 0 ? text : null
+}
+
+// Select → 선택된 옵션 name
+function extractSelect(properties: NotionProperties, name: string): string | null {
+	const property = properties[name]
+	if (property?.type !== "select") return null
+	return property.select?.name ?? null
+}
+
+// Date → start 값을 Date로 변환 (파싱 불가 문자열이면 null)
+function extractDate(properties: NotionProperties, name: string): Date | null {
+	const property = properties[name]
+	if (property?.type !== "date" || !property.date?.start) return null
+	const date = new Date(property.date.start)
+	return Number.isNaN(date.getTime()) ? null : date
+}
+
+// Number → 그대로 (미입력 시 null)
+function extractNumber(properties: NotionProperties, name: string): number | null {
+	const property = properties[name]
+	if (property?.type !== "number") return null
+	return property.number
+}
+
+// Notion 원시 페이지(Quotes 1건 + QuoteItems N건) → 내부 도메인 타입 Quote 변환.
+// 최종적으로 quoteSchema.parse로 검증하므로 필수 속성 누락·타입 불일치는
+// z.ZodError로 드러난다 (lib/notion.ts에서 NotionDataInvalidError로 감싸 던짐).
+function parseNotionQuotePage(
+	page: PageObjectResponse,
+	itemPages: PageObjectResponse[]
+): Quote {
+	const items = itemPages.map((itemPage) => {
+		const quantity = extractNumber(itemPage.properties, "수량")
+		const unitPrice = extractNumber(itemPage.properties, "단가")
+
+		return {
+			id: itemPage.id,
+			name: extractTitle(itemPage.properties, "항목명"),
+			quantity,
+			unitPrice,
+			// 합계는 Notion Formula 값을 신뢰하지 않고 서버에서 직접 계산한다
+			// (docs/notion-schema.md 원칙). 원값이 없으면 null → zod가 걸러낸다.
+			amount:
+				quantity !== null && unitPrice !== null ? quantity * unitPrice : null,
+			order: extractNumber(itemPage.properties, "순서"),
+		}
+	})
+
+	return quoteSchema.parse({
+		id: page.id,
+		title: extractTitle(page.properties, "견적명"),
+		quoteNumber: extractRichText(page.properties, "견적번호"),
+		shareToken: extractRichText(page.properties, "공유토큰"),
+		status: extractSelect(page.properties, "상태"),
+		clientName: extractRichText(page.properties, "클라이언트명"),
+		clientManager: extractRichText(page.properties, "담당자"),
+		issuedAt: extractDate(page.properties, "발행일"),
+		validUntil: extractDate(page.properties, "유효기간"),
+		note: extractRichText(page.properties, "비고"),
+		items,
+	})
 }
 
 // ── 금액 계산 순수 함수 ──────────────────────────────
