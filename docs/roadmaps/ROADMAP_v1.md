@@ -66,7 +66,7 @@
 
 전체 흐름은 **구조 우선 접근법**을 따릅니다: (1) 라우트 골격과 타입/스키마를 먼저 세우고, (2) 더미 데이터로 웹 뷰·PDF UI를 완성한 뒤, (3) 실제 Notion 연동으로 더미를 교체하고, (4) 캐싱·다크모드·만료 판정 등 마감 작업을 수행합니다. PRD 9장의 3주 마일스톤과 10장 리스크(R2 폰트 임베딩 스파이크, R4 인라인 자식 DB 탐색 스파이크)를 각 Phase 초반에 스파이크로 배치했습니다.
 
-> **진행 상황**: Phase 1(Task 001~002) ✅ 완료 · Phase 2(Task 003~004) ✅ 완료 · Task 005 [스파이크] ✅ 완료(R4 해소). 다음 우선순위는 **Task 006(Notion 스키마 구축 및 견적서 조회 로직 구현)**.
+> **진행 상황**: Phase 1(Task 001~002) ✅ 완료 · Phase 2(Task 003~004) ✅ 완료 · Phase 3(Task 005~009-1) ✅ 완료. 다음 우선순위는 **Task 010(Notion 응답 캐싱)**.
 
 ### Phase 1: 애플리케이션 골격 및 스키마 정의 (1주차 전반) ✅
 
@@ -109,7 +109,7 @@
   - 사용자 플로우·네비게이션 검증 (더미 데이터 기준 렌더링 확인)
   - 변경 사항: `page.tsx`에 7개 블록 조립(헤더·만료배너→공급자/수신자→항목표→금액요약→비고→PDF 버튼), 더미 조회 `findMockQuoteByToken` + 작성중/미존재 토큰 동일 404 분기, 금액 서버 계산, `robots` `noindex/nofollow`, PDF 버튼만 `'use client'`(`buttonVariants` 링크). **Playwright MCP 검증**: 375px/1280px 페이지 가로 스크롤 없음(테이블 내부 스크롤), 30개 대량 케이스 렌더링, 만료 배너 노출, 작성중·무작위 토큰 404 본문 동일성, `noindex` 메타 확인
 
-### Phase 3: 핵심 기능 구현 (Notion 연동 · PDF 생성)
+### Phase 3: 핵심 기능 구현 (Notion 연동 · PDF 생성) ✅
 
 > Phase 3는 리스크가 집중된 구간입니다. R4(인라인 자식 DB 탐색)와 R2(한글 폰트 임베딩)를 각각 스파이크로 먼저 검증한 뒤 본 구현에 들어갑니다.
 
@@ -120,7 +120,7 @@
   - Playwright MCP로 PoC 라우트 응답(JSON) 검증
   - 변경 사항: `src/app/api/notion-spike/route.ts` 개발 전용 PoC Route Handler 작성(프로덕션 404). 실제 Notion Integration으로 4단계 조회 흐름 전부 검증 성공 — ① 공유토큰 필터 쿼리(SDK v5: `databases.retrieve`→`data_sources`→`dataSources.query`) ② 페이지 `blocks.children`에서 `child_database` 탐색 ③ 자식 DB(QuoteItems) 항목 쿼리 ④ 항목명/수량/단가 파싱. **결론: 인라인 자식 DB 탐색 API로 가능, Relation 전환 불필요(R4 해소)**. 부수 작업으로 샘플 견적서 페이지에 인라인 QuoteItems DB(항목 3건, 속성 항목명/수량/단가/순서)를 API로 생성. 미해결 메모: 샘플 페이지 공유토큰(`1011-1111-1111-1111`)이 UUID v4 형식이 아니어서 `zod` uuid 검증과 충돌 — **Task 006에서 토큰 교체 또는 스키마 결정 필요**
 
-- **Task 006: Notion 스키마 구축 및 견적서 조회 로직 구현** - 우선순위
+- ✅ **Task 006: Notion 스키마 구축 및 견적서 조회 로직 구현** - 우선순위
   - PRD 5.1 스키마대로 실제 Notion Database(Quotes/QuoteItems) 생성 + 샘플 견적서 1건(항목 3개 이상) 입력
   - Task 005 미해결 사항 처리: 샘플 페이지 공유토큰(`1011-1111-1111-1111`)의 UUID v4 비호환 이슈 — 토큰 값을 UUID v4로 교체하거나 `quoteSchema` 토큰 검증 규칙을 확정
   - `lib/notion.ts`에 조회 로직 구현: 공유토큰 필터 → 자식 DB 항목 조회 → zod 파싱 → 서버 금액 계산 (Task 005 PoC의 4단계 흐름을 정식 코드로 이관)
@@ -128,29 +128,34 @@
   - 필수 속성 누락 시 "견적서 정보가 올바르지 않습니다" 안내 화면(500 아님)
   - `NOTION_API_KEY`가 클라이언트 번들에 포함되지 않음을 확인
   - **테스트 체크리스트**: Playwright MCP로 웹 뷰의 더미→실제 데이터 교체 검증, 금액 서버 계산값 일치, 필수 속성 누락 안내 화면 표시
+  - 변경 사항: `lib/notion.ts`에 `getQuoteByToken` 구현(공유토큰 필터→자식 DB 탐색→항목 쿼리→zod 파싱, `withRateLimitRetry`로 429 1회 재시도, `NotionRateLimitError`/`NotionDataInvalidError`로 안내 화면 분기). `quote-schema.ts`의 `parseNotionQuotePage` stub을 Notion property 추출 헬퍼 기반 실구현으로 교체. `page.tsx`를 mock에서 실제 Notion 조회로 전환, `notion-spike` 라우트 삭제. 실제 Notion 워크스페이스 스키마를 문서 기준으로 정정(견적명/견적번호 속성 분리, 상태 Select 타입 전환, 담당자/비고 추가)하고 웹 뷰 실렌더링 검증 완료. 캐싱(`unstable_cache`+`revalidate 60`)은 Task 010으로 스코프 이관.
 
-- **Task 007: 접근 제어 및 상태별 노출 규칙 구현**
+- ✅ **Task 007: 접근 제어 및 상태별 노출 규칙 구현**
   - 유효 토큰 + '발송됨' 이상 상태만 열람, 그 외 동일한 404 응답(존재 여부 구분 불가)
   - 무작위 UUID·'작성중'·빈 토큰 → 응답 본문·상태코드 동일한 404
   - 상태 배지/만료 배너를 실제 상태값과 연결
   - **테스트 체크리스트**: Playwright MCP E2E — 발송됨/승인 열람 성공, 작성중 404, 무작위 UUID 404 동일성, `noindex` 메타 포함, 번들 내 `NOTION_API_KEY` 미노출
+  - 변경 사항: Task 006에서 이미 구현된 조회 계층 수준의 접근 제어("작성중"을 `null`로 조기 정규화)가 요구사항을 구조적으로 충족함을 확인. Playwright E2E로 실증(발송됨 200, 무작위 UUID/비UUID/빈 토큰 모두 바이트 단위 동일 404, API 키 미노출, `noindex` 확인). 코드 수정 없이 검증만으로 완료.
 
-- **Task 008: [스파이크] PDF 한글 폰트 임베딩 검증** - 우선순위
+- ✅ **Task 008: [스파이크] PDF 한글 폰트 임베딩 검증** - 우선순위
   - Pretendard(또는 Noto Sans KR) 서브셋 폰트를 `src/lib/fonts/`에 포함, `@react-pdf/renderer`에 등록
   - 최소 PDF에 한글 텍스트를 렌더링해 깨짐 여부·폰트 용량·콜드스타트 영향 확인(R2 완화)
   - macOS 미리보기 / Windows Acrobat 기준 한글 렌더링 확인
+  - 변경 사항: Pretendard TTF(Regular/Bold)를 `public/fonts/`에 vendoring, `fs.readFileSync`+base64 data URL로 `Font.register`. `require.resolve`(Turbopack이 모듈로 오인해 빌드 실패)와 `outputFileTracingIncludes`(Turbopack에서 무시됨)를 차례로 시도했다가 실패를 실증 확인한 뒤 `public/` 정적 자산 방식으로 확정. 실제 프로덕션 빌드+서버로 PDF 생성 검증(`nft.json`에 폰트 포함, `/Type0`+`FontFile2`로 CJK 임베딩 확인), 한글 깨짐 없음.
 
-- **Task 009: PDF 다운로드 Route Handler 구현**
+- ✅ **Task 009: PDF 다운로드 Route Handler 구현**
   - `/quote/[token]/pdf/route.ts` — `QuotePdfDocument`(A4 세로) 렌더링, 바이너리 응답
   - 파일명 규칙 `견적서_{견적번호}_{클라이언트명}.pdf` + `Content-Disposition: attachment`
   - 웹 뷰와 동일한 7개 블록, 항목 30개 시 2페이지 이상 분할 + 페이지 번호
   - 웹 뷰와 동일 접근 제어(작성중/토큰 불일치 시 404), PDF는 항상 라이트 테마 고정
   - **테스트 체크리스트**: Playwright MCP — 다운로드 파일명 규칙, 한글 미깨짐, 항목 30개 다중 페이지 분할, PDF 금액=웹 뷰 일치, 작성중 PDF URL 404
+  - 변경 사항: `quote-pdf-document.tsx`를 웹 뷰 7블록 대응 A4 레이아웃으로 확장(`View`/`Text` flexbox로 표 구현, `wrap={false}`로 행 단위 페이지 분할, 페이지 번호 `fixed`+`render`), `calculateQuoteAmounts`/`formatKRW` 재사용. `pdf/route.ts`를 501 스텁에서 실구현으로 교체(`getQuoteByToken` 재사용, `NotionRateLimitError`→429/`NotionDataInvalidError`→502, 파일명 RFC 5987+ASCII fallback 병행). 항목 31개로 2페이지 분할·긴 항목명 줄바꿈을 실제 PDF 생성+텍스트 추출로 검증. 코드 리뷰 반영으로 `formatDateKR`/`sortItemsByOrder`를 `quote-schema.ts`로 추출해 웹 뷰·PDF 공유, 비고 개행을 명시적 줄 분리로 처리.
 
-- **Task 009-1: 핵심 기능 통합 테스트**
+- ✅ **Task 009-1: 핵심 기능 통합 테스트**
   - Playwright MCP로 공급자→클라이언트 전체 플로우 검증(열람→PDF 저장)
   - Notion 연동·금액 계산·상태 판정·PDF 생성 비즈니스 로직 통합 검증
   - 엣지 케이스: 항목 0개, 필수 속성 누락, 429 재시도, 유효기간 경계값, 빈/손상 토큰
+  - 변경 사항: 실제 토큰으로 전체 플로우(웹 뷰 열람→PDF 다운로드) E2E 검증, 웹/PDF 금액 완전 일치 확인(공급가액 2,400,000원/부가세 240,000원/총액 2,640,000원). 엣지 케이스 전부 통과(항목 0개 안전 처리, 필수 속성 누락 시 `NotionDataInvalidError` 경로 확인, 비정상 경로 전부 404, 429 재시도 로직 코드 리뷰). 발견된 결함 없이 소스 변경 0건으로 완료.
 
 ### Phase 4: 비기능 요구사항 및 마감 (P1 · 3주차)
 
@@ -185,8 +190,8 @@
 
 | 리스크 | 완화 배치 |
 | --- | --- |
-| R1 rate limit | Task 006(429 재시도), Task 010(60초 캐싱) |
-| R2 한글 폰트/용량 | **Task 008 스파이크 선행** + 서브셋 폰트 |
-| R3 공급자 스키마 임의 변경 | Task 006(zod 안내 화면), Task 012(스키마 가이드) |
+| R1 rate limit | 🔶 **Task 006에서 부분 완화** — 429 수신 시 1회 재시도(`withRateLimitRetry`) 구현 완료. 60초 캐싱은 Task 010에서 마감 |
+| R2 한글 폰트/용량 | ✅ **Task 008 스파이크로 해소** — Pretendard TTF를 `public/fonts/`에서 base64 data URL로 임베딩, CJK 렌더링 확인 |
+| R3 공급자 스키마 임의 변경 | ✅ **Task 006에서 완화 적용** — zod 검증 실패 시 `NotionDataInvalidError`로 안내 화면 분기(500 아님). 스키마 가이드 문서화는 Task 012에서 마감 |
 | R4 인라인 자식 DB 탐색 복잡도 | ✅ **Task 005 스파이크로 해소** — API로 인라인 자식 DB 탐색 가능 확인, Relation 전환 불필요 |
 | R5 토큰 유출 | Task 012(노션 토큰 교체 무효화 가이드) |
