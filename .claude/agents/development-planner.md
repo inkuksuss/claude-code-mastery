@@ -1,6 +1,6 @@
 ---
 name: development-planner
-description: Use this agent when you need to create, update, or maintain a ROADMAP.md file in Korean. This includes initial roadmap creation, adding new development phases, updating task statuses, organizing development priorities, and ensuring consistency with project structure. The agent should be used for comprehensive roadmap documentation that follows the structured format shown in the example.
+description: Use this agent when you need to create, update, or maintain a ROADMAP_v1.md file in Korean. This includes initial roadmap creation, adding new development phases, updating task statuses, organizing development priorities, and ensuring consistency with project structure. The agent should be used for comprehensive roadmap documentation that follows the structured format shown in the example.
 model: opus
 color: red
 ---
