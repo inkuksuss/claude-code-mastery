@@ -7,6 +7,7 @@ import {
 	isNotionClientError,
 } from "@notionhq/client"
 import type { PageObjectResponse } from "@notionhq/client"
+import { unstable_cache } from "next/cache"
 import { z } from "zod"
 
 import { DRAFT_STATUS, parseNotionQuotePage, type Quote } from "@/lib/quote-schema"
@@ -160,7 +161,7 @@ async function findChildDatabaseId(
 // 공유토큰으로 견적서를 조회한다. 다음 경우 모두 null을 반환해
 // 상위(page.tsx)에서 "존재하지 않음"과 구분할 코드 경로 자체를 없앤다:
 //   - 토큰이 UUID 형식이 아님 / 매칭 페이지 없음 / 상태가 "작성중"(비공개)
-export async function getQuoteByToken(token: string): Promise<Quote | null> {
+async function fetchQuoteByToken(token: string): Promise<Quote | null> {
 	// 형식 검증 실패 시 Notion API 호출 없이 즉시 종료
 	if (!shareTokenSchema.safeParse(token).success) {
 		return null
@@ -231,5 +232,13 @@ export async function getQuoteByToken(token: string): Promise<Quote | null> {
 		throw error
 	}
 }
+
+// fetchQuoteByToken을 60초 캐싱으로 감싼 공개 진입점 (Task 010, R1 완화).
+// unstable_cache는 예외 발생 시 결과를 캐시하지 않으므로 rate limit·데이터 불량
+// 에러는 매 요청 재조회되고, 정상 조회 결과(Quote | null)만 60초간 재사용된다.
+// (토큰은 함수 인자로 자동 캐시 키에 포함되므로 keyParts에 별도로 넣지 않는다)
+export const getQuoteByToken = unstable_cache(fetchQuoteByToken, ["quote-by-token"], {
+	revalidate: 60,
+})
 
 export { getNotionClient }
