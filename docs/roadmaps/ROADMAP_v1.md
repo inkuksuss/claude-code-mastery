@@ -66,7 +66,7 @@
 
 전체 흐름은 **구조 우선 접근법**을 따릅니다: (1) 라우트 골격과 타입/스키마를 먼저 세우고, (2) 더미 데이터로 웹 뷰·PDF UI를 완성한 뒤, (3) 실제 Notion 연동으로 더미를 교체하고, (4) 캐싱·다크모드·만료 판정 등 마감 작업을 수행합니다. PRD 9장의 3주 마일스톤과 10장 리스크(R2 폰트 임베딩 스파이크, R4 인라인 자식 DB 탐색 스파이크)를 각 Phase 초반에 스파이크로 배치했습니다.
 
-> **진행 상황**: Phase 1(Task 001~002) ✅ 완료 · Phase 2(Task 003~004) ✅ 완료 · Phase 3(Task 005~009-1) ✅ 완료. 다음 우선순위는 **Task 010(Notion 응답 캐싱)**.
+> **진행 상황**: Phase 1(Task 001~002) ✅ 완료 · Phase 2(Task 003~004) ✅ 완료 · Phase 3(Task 005~009-1) ✅ 완료 · Task 010 ✅ 완료. 다음 우선순위는 **Task 011(다크 모드 대응 및 만료 자동 판정)**.
 
 ### Phase 1: 애플리케이션 골격 및 스키마 정의 (1주차 전반) ✅
 
@@ -159,10 +159,11 @@
 
 ### Phase 4: 비기능 요구사항 및 마감 (P1 · 3주차)
 
-- **Task 010: Notion 응답 캐싱 (P1)**
+- ✅ **Task 010: Notion 응답 캐싱 (P1)**
   - Notion SDK 호출을 `unstable_cache`(또는 `"use cache"`) + `revalidate: 60`으로 래핑
   - 캐시 히트 TTFB 1초 이내 / 미스 3초 이내, PDF 생성 10초 이내(항목 30개) 목표 확인
   - **테스트 체크리스트**: Playwright MCP — 노션 수정 후 최대 60초 내 반영, 캐시 히트/미스 응답 시간 측정
+  - 변경 사항: `lib/notion.ts`의 `getQuoteByToken`을 `unstable_cache(fetchQuoteByToken, ["quote-by-token"], { revalidate: 60 })`로 래핑(모듈 스코프 상수로 고정해 캐시 함수 재생성 방지). 웹 뷰(`page.tsx`)와 PDF Route(`pdf/route.ts`)가 동일 함수를 호출하므로 캐시가 자동 공유됨. `NotionRateLimitError`/`NotionDataInvalidError`는 예외이므로 `unstable_cache`가 캐시하지 않아 매 요청 재조회됨(정상 조회 결과만 60초 캐싱). `npm run lint`/`npm run build` 통과, code-reviewer 역할 리뷰 완료. **미검증 사항**: 유효한 견적서 공유토큰 부재로 캐시 히트/미스 응답 시간 실측과 "노션 수정 후 60초 내 반영" Playwright 검증은 아직 수행하지 못함 — 토큰 확보 후 추가 검증 필요.
 
 - **Task 011: 다크 모드 대응 및 만료 자동 판정 (P1)**
   - 웹 뷰 라이트/다크 대응(next-themes 인프라 활용), PDF는 라이트 고정 유지
@@ -190,7 +191,7 @@
 
 | 리스크 | 완화 배치 |
 | --- | --- |
-| R1 rate limit | 🔶 **Task 006에서 부분 완화** — 429 수신 시 1회 재시도(`withRateLimitRetry`) 구현 완료. 60초 캐싱은 Task 010에서 마감 |
+| R1 rate limit | ✅ **Task 006(429 재시도) + Task 010(60초 캐싱)으로 완화** — `withRateLimitRetry` 1회 재시도 + `unstable_cache(revalidate 60)`으로 반복 조회 시 Notion API 호출 자체를 줄임. 캐시 히트/미스 응답 시간 실측은 유효 토큰 확보 후 추가 검증 필요 |
 | R2 한글 폰트/용량 | ✅ **Task 008 스파이크로 해소** — Pretendard TTF를 `public/fonts/`에서 base64 data URL로 임베딩, CJK 렌더링 확인 |
 | R3 공급자 스키마 임의 변경 | ✅ **Task 006에서 완화 적용** — zod 검증 실패 시 `NotionDataInvalidError`로 안내 화면 분기(500 아님). 스키마 가이드 문서화는 Task 012에서 마감 |
 | R4 인라인 자식 DB 탐색 복잡도 | ✅ **Task 005 스파이크로 해소** — API로 인라인 자식 DB 탐색 가능 확인, Relation 전환 불필요 |
